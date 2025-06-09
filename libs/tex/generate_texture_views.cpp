@@ -216,14 +216,14 @@ from_nvm_scene(std::string const & nvm_file,
 }
 
 void
-generate_texture_views(std::string const & in_scene,
+generate_texture_views(std::string const & image_source_path,
     std::vector<TextureView> * texture_views, std::string const & tmp_dir)
 {
     /* Determine input format. */
 
     /* BUNDLEFILE */
-    if (util::fs::file_exists(in_scene.c_str())) {
-        std::string const & file = in_scene;
+    if (util::fs::file_exists(image_source_path.c_str())) {
+        std::string const & file = image_source_path;
         std::string extension = util::string::uppercase(util::string::right(file, 3));
         if (extension == "NVM") {
             from_nvm_scene(file, texture_views, tmp_dir);
@@ -231,15 +231,15 @@ generate_texture_views(std::string const & in_scene,
     }
 
     /* SCENE_FOLDER */
-    if (util::fs::dir_exists(in_scene.c_str())) {
-        from_images_and_camera_files(in_scene, texture_views, tmp_dir);
+    if (util::fs::dir_exists(image_source_path.c_str())) {
+        from_images_and_camera_files(image_source_path, texture_views, tmp_dir);
     }
 
     /* MVE_SCENE::EMBEDDING */
-    size_t pos = in_scene.rfind("::");
+    size_t pos = image_source_path.rfind("::");
     if (pos != std::string::npos) {
-        std::string scene_dir = in_scene.substr(0, pos);
-        std::string image_name = in_scene.substr(pos + 2, in_scene.size());
+        std::string scene_dir = image_source_path.substr(0, pos);
+        std::string image_name = image_source_path.substr(pos + 2, image_source_path.size());
         from_mve_scene(scene_dir, image_name, texture_views);
     }
 

@@ -18,6 +18,7 @@ struct Arguments {
     std::string in_scene;
     std::string in_mesh;
     std::string out_prefix;
+    std::string alternative_image_folder;
 
     std::string data_cost_file;
     std::string labeling_file;

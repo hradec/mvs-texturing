@@ -46,10 +46,10 @@ void
 prepare_mesh(mve::MeshInfo * mesh_info, mve::TriangleMesh::Ptr mesh);
 
 /**
-  * Generates TextureViews from the in_scene.
+  * Generates TextureViews from the image_source_path.
   */
 void
-generate_texture_views(std::string const & in_scene,
+generate_texture_views(std::string const & image_source_path,
     TextureViews * texture_views, std::string const & tmp_dir);
 
 /**

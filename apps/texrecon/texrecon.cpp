@@ -79,7 +79,12 @@ int main(int argc, char **argv) {
 
     std::cout << "Generating texture views: " << std::endl;
     tex::TextureViews texture_views;
-    tex::generate_texture_views(conf.in_scene, &texture_views, tmp_dir);
+    std::string effective_image_source_path = conf.in_scene;
+    if (!conf.alternative_image_folder.empty()) {
+        effective_image_source_path = conf.alternative_image_folder;
+        std::cout << "\tUsing alternative image folder: " << effective_image_source_path << std::endl;
+    }
+    tex::generate_texture_views(effective_image_source_path, &texture_views, tmp_dir);
 
     write_string_to_file(conf.out_prefix + ".conf", conf.to_string());
     timer.measure("Loading");

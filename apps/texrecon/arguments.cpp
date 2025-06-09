@@ -89,6 +89,7 @@ Arguments parse_args(int argc, char **argv) {
         "Do not write out intermediate results");
     args.add_option('\0', NUM_THREADS, true,
         "How many threads to use. Set 1 for determinism.");
+    args.add_option('\0', "alternative_image_folder", true, "Use images from this folder for texturing an existing mesh");
     args.parse(argc, argv);
 
     Arguments conf;
@@ -97,6 +98,7 @@ Arguments parse_args(int argc, char **argv) {
     conf.out_prefix = util::fs::sanitize_path(args.get_nth_nonopt(2));
 
     /* Set defaults for optional arguments. */
+    conf.alternative_image_folder = "";
     conf.data_cost_file = "";
     conf.labeling_file = "";
 
@@ -148,6 +150,8 @@ Arguments parse_args(int argc, char **argv) {
                 conf.write_intermediate_results = false;
             } else if (i->opt->lopt == NUM_THREADS) {
                 conf.num_threads = std::stoi(i->arg);
+            } else if (i->opt->lopt == "alternative_image_folder") {
+                conf.alternative_image_folder = i->arg;
             } else {
                 throw std::invalid_argument("Invalid long option");
             }
@@ -171,6 +175,7 @@ Arguments::to_string(){
     out << "Input scene: \t" << in_scene << std::endl
         << "Input mesh: \t" << in_mesh << std::endl
         << "Output prefix: \t" << out_prefix << std::endl
+        << "Alternative image folder: \t" << alternative_image_folder << std::endl
         << "Datacost file: \t" << data_cost_file << std::endl
         << "Labeling file: \t" << labeling_file << std::endl
         << "Data term: \t" << choice_string<tex::DataTerm>(settings.data_term) << std::endl
