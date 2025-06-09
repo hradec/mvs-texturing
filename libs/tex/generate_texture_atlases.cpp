@@ -176,7 +176,7 @@ generate_texture_atlases(mve::TriangleMesh::ConstPtr mesh, // Added mesh
         // mve::TriangleMesh::VertexList const& mesh_vertices = mesh->get_vertices(); // Original mesh vertices (not directly needed with current map approach)
 
         for (std::size_t atlas_idx = 0; atlas_idx < texture_atlases->size(); ++atlas_idx) {
-            TextureAtlas::ConstPtr atlas = (*texture_atlases)[atlas_idx];
+            TextureAtlas::Ptr atlas = (*texture_atlases)[atlas_idx]; // Changed ConstPtr to Ptr
 
             std::vector<std::size_t> const& atlas_mesh_face_ids = atlas->get_faces(); // Using std::vector directly for clarity
             std::vector<math::Vec2f> const& atlas_uvs = atlas->get_texcoords(); // Using std::vector directly for clarity
