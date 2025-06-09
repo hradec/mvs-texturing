@@ -455,7 +455,8 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
     mve::MeshInfo const & mesh_info,
     std::vector<TextureView> * texture_views, Settings const & settings,
     std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
-    std::vector<TexturePatch::Ptr> * texture_patches) {
+    std::vector<TexturePatch::Ptr> * texture_patches,
+    ProjectionCache * out_projection_cache) { // Added out_projection_cache
 
     util::WallTimer timer;
 
@@ -511,10 +512,33 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
         for (; it != candidates.end(); ++it) {
             std::size_t texture_patch_id;
 
-            #pragma omp critical
+            #pragma omp critical (TexturePatchCreation)
             {
                 texture_patches->push_back(it->texture_patch);
-                texture_patch_id = num_patches++;
+                texture_patch_id = num_patches++; // num_patches needs to be managed carefully if critical sections are separate
+            }
+
+            // Populate projection cache if requested
+            if (out_projection_cache != nullptr) {
+                std::vector<std::size_t> const & faces_in_patch = it->texture_patch->get_faces();
+                std::vector<math::Vec2f> const & texcoords_in_patch = it->texture_patch->get_texcoords();
+                for (std::size_t k = 0; k < faces_in_patch.size(); ++k) {
+                    CachedFaceTextureInfo info;
+                    info.face_id = faces_in_patch[k];
+                    info.source_view_label = it->texture_patch->get_label();
+                    info.source_view_rect = it->bounding_box; // 'it' is the TexturePatchCandidate
+                    // Ensure patch_texcoords has space if not guaranteed by constructor
+                    if (info.patch_texcoords.size() != 3) info.patch_texcoords.resize(3);
+                    info.patch_texcoords[0] = texcoords_in_patch[k*3];
+                    info.patch_texcoords[1] = texcoords_in_patch[k*3+1];
+                    info.patch_texcoords[2] = texcoords_in_patch[k*3+2];
+                    info.target_atlas_idx = static_cast<std::size_t>(-1); // Mark as not in atlas yet
+
+                    #pragma omp critical (ProjectionCacheUpdate)
+                    {
+                        out_projection_cache->push_back(info);
+                    }
+                }
             }
 
             std::vector<std::size_t> const & faces = it->texture_patch->get_faces();
@@ -528,7 +552,7 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
 
                     VertexProjectionInfo info = {texture_patch_id, projection, {face_id}};
 
-                    #pragma omp critical
+                    #pragma omp critical (VertexProjectionInfoUpdate)
                     vertex_projection_infos->at(vertex_id).push_back(info);
                 }
             }
@@ -556,7 +580,7 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
                 num_patches += 1;
             } else {
                 if (settings.keep_unseen_faces) {
-                    #pragma omp critical
+                    #pragma omp critical (UnseenFacesUpdate)
                     unseen_faces.insert(unseen_faces.end(),
                         subgraph.begin(), subgraph.end());
                 }

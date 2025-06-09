@@ -89,7 +89,9 @@ Arguments parse_args(int argc, char **argv) {
         "Do not write out intermediate results");
     args.add_option('\0', NUM_THREADS, true,
         "How many threads to use. Set 1 for determinism.");
-    args.add_option('\0', "alternative_image_folder", true, "Use images from this folder for texturing an existing mesh");
+    args.add_option('\0', "alternative_image_folder", true, "Use images from this folder. If --input_projection_cache is used, these are the new images for re-texturing.");
+    args.add_option('\0', "output_projection_cache", true, "Save a projection cache file after texturing. This cache can be used for future UV-preserving re-texturing runs with --input_projection_cache.");
+    args.add_option('\0', "input_projection_cache", true, "Use a previously generated projection cache for re-texturing. Requires --alternative_image_folder.");
     args.parse(argc, argv);
 
     Arguments conf;
@@ -101,6 +103,8 @@ Arguments parse_args(int argc, char **argv) {
     conf.alternative_image_folder = "";
     conf.data_cost_file = "";
     conf.labeling_file = "";
+    conf.output_projection_cache_file = "";
+    conf.input_projection_cache_file = "";
 
     conf.write_timings = false;
     conf.write_intermediate_results = true;
@@ -152,6 +156,10 @@ Arguments parse_args(int argc, char **argv) {
                 conf.num_threads = std::stoi(i->arg);
             } else if (i->opt->lopt == "alternative_image_folder") {
                 conf.alternative_image_folder = i->arg;
+            } else if (i->opt->lopt == "output_projection_cache") {
+                conf.output_projection_cache_file = i->arg;
+            } else if (i->opt->lopt == "input_projection_cache") {
+                conf.input_projection_cache_file = i->arg;
             } else {
                 throw std::invalid_argument("Invalid long option");
             }
@@ -178,6 +186,8 @@ Arguments::to_string(){
         << "Alternative image folder: \t" << alternative_image_folder << std::endl
         << "Datacost file: \t" << data_cost_file << std::endl
         << "Labeling file: \t" << labeling_file << std::endl
+        << "Output projection cache file: \t" << output_projection_cache_file << std::endl
+        << "Input projection cache file: \t" << input_projection_cache_file << std::endl
         << "Data term: \t" << choice_string<tex::DataTerm>(settings.data_term) << std::endl
         << "Smoothness term: \t" << choice_string<tex::SmoothnessTerm>(settings.smoothness_term) << std::endl
         << "Outlier removal method: \t" << choice_string<tex::OutlierRemoval>(settings.outlier_removal) << std::endl

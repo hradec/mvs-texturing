@@ -80,6 +80,42 @@ By starting the application without any parameters and you will get a
 description of the expected file formats and optional parameters.
 
 
+UV-Preserving Re-Texturing (Experimental)
+--------------------------------------------------------------------------------
+
+This feature allows you to re-texture a mesh using a previously generated UV layout and seam configuration, applying new images or modified processing settings while preserving the texture coordinates of the original texturing run. This is useful if you want to, for example, apply different lighting conditions (by providing new images) or try different seam leveling settings without re-calculating the entire UV parameterization.
+
+The process involves two stages:
+
+1.  **Cache Generation**: During an initial texturing run, you save a "projection cache". This cache stores information about which parts of which source images were used for each face, and how these parts are mapped to the texture atlases.
+    To generate the cache, run `texrecon` as usual, but add the `--output_projection_cache <cache_filepath.pcache>` option:
+    ```bash
+    ./apps/texrecon/texrecon <path_to_scene> <path_to_mesh.ply> <output_prefix_stage1> --output_projection_cache <path_to_your_cache.pcache> [other_options]
+    ```
+    This will produce the standard textured model (`<output_prefix_stage1>.obj`, etc.) and the projection cache file (`<path_to_your_cache.pcache>`).
+
+2.  **Re-Texturing from Cache**: To re-texture using the generated cache, you provide the *same input mesh* and the cache file, along with a *new set of images* (if desired) and a *different output prefix*.
+    ```bash
+    ./apps/texrecon/texrecon <dummy_scene_not_used> <path_to_mesh.ply> <output_prefix_stage2> --input_projection_cache <path_to_your_cache.pcache> --alternative_image_folder <path_to_new_images_folder> [other_options_for_postprocessing]
+    ```
+    *   `<dummy_scene_not_used>`: The first positional argument (input scene) is not strictly used when re-texturing from a cache but is still required by the argument parser. You can provide the original scene path or a placeholder.
+    *   `<path_to_mesh.ply>`: **Must be the same mesh file used in Stage 1.**
+    *   `<output_prefix_stage2>`: Use a different output prefix to avoid overwriting your original textured model.
+    *   `--input_projection_cache <path_to_your_cache.pcache>`: Specifies the cache file to use.
+    *   `--alternative_image_folder <path_to_new_images_folder>`: Specifies the folder containing the new set of images to apply. This is **required** for re-texturing.
+    *   `[other_options_for_postprocessing]`: Options like `--tone_mapping` can be changed. Options affecting UV generation or view selection (e.g., `--data_term`, `--outlier_removal` for view selection) will be ignored as this information is taken from the cache.
+
+**Important Considerations**:
+*   The input mesh (`IN_MESH`) provided in both stages must be identical.
+*   The `--alternative_image_folder` is mandatory for the re-texturing stage.
+*   The output prefix should be different for the second stage to avoid overwriting results.
+
+**Current Limitations**:
+*   **Rasterizer**: The current implementation uses a placeholder for transferring new textures onto the existing UV layout. This placeholder fills the bounding box of each face's UV chart in the atlas with a single color sampled from the new texture. A proper triangle rasterizer/warper is needed for visually correct results.
+*   **Seam Leveling**: Global and local seam leveling are currently skipped in the UV-preserving re-texturing mode.
+*   **Atlas Size**: The re-texturing process currently assumes a fixed default atlas size for the new atlases. If the original texturing run used a different atlas size (e.g., due to very large or very small texture patches), this might lead to suboptimal results or errors. Future improvements might include storing atlas dimensions in the cache.
+
+
 Troubleshooting
 --------------------------------------------------------------------------------
 

@@ -22,6 +22,12 @@
 #include "texture_patch.h"
 #include "rectangular_bin.h"
 
+TEX_NAMESPACE_BEGIN // Ensure it's within the namespace if not already
+
+constexpr unsigned int MAX_ATLAS_TEXTURE_SIZE = 8 * 1024;
+constexpr unsigned int PREF_ATLAS_TEXTURE_SIZE = 4 * 1024;
+constexpr unsigned int MIN_ATLAS_TEXTURE_SIZE = 256;
+
 /**
   * Class representing a texture atlas.
   */
@@ -59,8 +65,10 @@ class TextureAtlas {
         TexcoordIds const & get_texcoord_ids(void) const;
         Texcoords const & get_texcoords(void) const;
         mve::ByteImage::ConstPtr get_image(void) const;
+        mve::ByteImage::Ptr get_mutable_image(void); // New method
 
         bool insert(TexturePatch::ConstPtr texture_patch);
+        void pre_populate_layout(Faces const& new_faces, TexcoordIds const& new_ids, Texcoords const& new_uvs); // New method
 
         void finalize(void);
 };
@@ -92,5 +100,18 @@ TextureAtlas::get_image(void) const {
     }
     return image;
 }
+
+inline mve::ByteImage::Ptr
+TextureAtlas::get_mutable_image(void) {
+    // Image is allocated in constructor. Here, just return it.
+    // Finalized check might be relevant depending on usage.
+    return image;
+}
+
+// Declaration for pre_populate_layout needs to be added to the class body,
+// definition would typically be in the .cpp file or inline if simple.
+// For now, leaving as declaration. Implementation will be needed if used.
+
+TEX_NAMESPACE_END // Ensure it's within the namespace
 
 #endif /* TEX_TEXTUREATLAS_HEADER */

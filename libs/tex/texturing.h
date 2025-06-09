@@ -23,6 +23,7 @@
 #include "texture_patch.h"
 #include "texture_atlas.h"
 #include "sparse_table.h"
+#include "projection_cache.h" // Added for ProjectionCache
 
 #include "seam_leveling.h"
 
@@ -88,7 +89,8 @@ void generate_texture_patches(UniGraph const & graph,
     TextureViews * texture_views,
     Settings const & settings,
     VertexProjectionInfos * vertex_projection_infos,
-    TexturePatches * texture_patches);
+    TexturePatches * texture_patches,
+    ProjectionCache * out_projection_cache = nullptr);
 
 /**
   * Runs the seam leveling procedure proposed by Ivanov and Lempitsky
@@ -106,8 +108,10 @@ local_seam_leveling(UniGraph const & graph, mve::TriangleMesh::ConstPtr mesh,
     TexturePatches * texture_patches);
 
 void
-generate_texture_atlases(TexturePatches * texture_patches,
-    Settings const & settings, TextureAtlases * texture_atlases);
+generate_texture_atlases(mve::TriangleMesh::ConstPtr mesh, // Added mesh for atlas UV lookup
+    TexturePatches * texture_patches,
+    Settings const & settings, TextureAtlases * texture_atlases,
+    ProjectionCache * io_projection_cache = nullptr);
 
 /**
   * Builds up an model for the mesh by constructing materials and

@@ -23,6 +23,9 @@ struct Arguments {
     std::string data_cost_file;
     std::string labeling_file;
 
+    std::string output_projection_cache_file; // New
+    std::string input_projection_cache_file;  // New
+
     tex::Settings settings;
 
     bool write_timings;

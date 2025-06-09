@@ -251,3 +251,72 @@ TextureAtlas::finalize() {
 
     this->finalized = true;
 }
+
+void
+TextureAtlas::pre_populate_layout(Faces const& new_faces, TexcoordIds const& new_ids, Texcoords const& new_uvs) {
+    if (finalized) {
+        throw util::Exception("Cannot pre-populate layout, TextureAtlas already finalized");
+    }
+
+    // Clear any existing layout data if necessary, or assert it's empty
+    // For re-texturing, we are starting with a fresh TextureAtlas instance created with a size,
+    // so bin, image, validity_mask are already initialized.
+    // The faces, texcoords, texcoord_ids are empty initially.
+
+    this->faces = new_faces;
+    this->texcoord_ids = new_ids; // These are original vertex IDs
+    this->texcoords = new_uvs;   // These are the UVs for those vertex IDs
+
+    // Important: The `merge_texcoords()` method, which is normally called in `finalize()`,
+    // deduplicates texcoords and re-indexes `texcoord_ids` to be indices into the deduplicated `texcoords` list.
+    // If `build_model` relies on this specific structure (deduplicated UVs and indexed IDs),
+    // then pre-populating `texcoords` and `texcoord_ids` directly as done here might be what's needed
+    // if `new_uvs` are already the unique UVs and `new_ids` are indices into `new_uvs`.
+    // However, the current `projection_cache` stores per-face UVs, and `TextureAtlas` expects UVs per vertex.
+    // The cache stores 3 UVs per face in `atlas_texcoords`. `build_model` uses `atlas->get_texcoord_ids()` which are vertex IDs,
+    // and `atlas->get_texcoords()` which are the UVs for those vertex IDs.
+
+    // The current structure of `TextureAtlas::finalize()` calls `merge_texcoords()`.
+    // The projection cache stores `atlas_texcoords` as 3 Vec2f per face.
+    // The `build_model` function expects `texcoord_ids` to be vertex indices and `texcoords` to be the UVs for those *vertices*.
+    // So, the `pre_populate_layout` should indeed populate `this->faces`, `this->texcoord_ids` (with vertex IDs),
+    // and `this->texcoords` (with the unique UVs for those vertex IDs).
+    // The `projection_cache` stores `CachedFaceTextureInfo::atlas_texcoords` (3 UVs per face) and `CachedFaceTextureInfo::face_id`.
+    // To correctly populate the atlas for `build_model`, we need to:
+    // 1. Collect all unique (vertex_id, uv) pairs from the projection_cache for this atlas.
+    // 2. Populate `this->texcoords` with the unique UVs.
+    // 3. Populate `this->texcoord_ids` with the vertex_ids, ensuring the indices match `this->texcoords`.
+    // This is essentially what `merge_texcoords` does, but based on vertex IDs.
+
+    // For now, let's assume `new_faces`, `new_ids` (as vertex_ids), and `new_uvs` (as unique UVs for those vertex_ids)
+    // are provided in the correct format by the caller. The re-texturing logic in texrecon.cpp
+    // will need to construct these correctly from the projection_cache.
+    // This means `new_ids` should be the list of vertex indices for the faces,
+    // and `new_uvs` should be the UVs for those vertices, normalized to [0,1].
+    // The `projection_cache.atlas_texcoords` are already normalized.
+
+    // The current `TextureAtlas::insert` populates `faces` and `texcoords` (which are then merged).
+    // `texcoords` before merging are 3 UVs per face, normalized.
+    // `texcoord_ids` are populated by `merge_texcoords`.
+
+    // If `pre_populate_layout` is given data that is *already* in the final, merged format
+    // (i.e., `new_uvs` are unique UVs, and `new_ids` are indices into `new_uvs` for each face corner),
+    // then `merge_texcoords()` should perhaps not be called again or be aware.
+
+    // Let's stick to the simplest interpretation: this function sets the members directly.
+    // The re-texturing logic will be responsible for providing them in the structure
+    // that `build_model` eventually expects *after* `finalize` (which calls `merge_texcoords`).
+    // So, `new_uvs` here should be the list of per-face-vertex UVs (3 per face),
+    // and `new_ids` can be empty because `merge_texcoords` will populate it.
+    // This makes `pre_populate_layout` simpler:
+    // this->faces = new_faces;
+    // this->texcoords = new_uvs; // These are 3 UVs per face, normalized.
+    // this->texcoord_ids.clear(); // merge_texcoords will fill this.
+
+    // The crucial part is that `build_model` uses `atlas->get_faces()`, `atlas->get_texcoord_ids()`,
+    // and `atlas->get_texcoords()`. These are typically available *after* `finalize()`.
+    // If we are re-texturing, `finalize()` will be called.
+    // So, we need to provide `faces` and `texcoords` (3 per face) to this function.
+    // `finalize()` will then call `merge_texcoords()` which will populate `texcoord_ids`
+    // and deduplicate `texcoords`. This seems like the correct flow.
+}
