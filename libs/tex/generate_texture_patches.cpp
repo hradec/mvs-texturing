@@ -486,8 +486,8 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
         std::list<TexturePatchCandidate>::iterator it, sit;
         for (it = candidates.begin(); it != candidates.end(); ++it) {
             for (sit = candidates.begin(); sit != candidates.end();) {
-                Rect<int> bounding_box = sit->bounding_box;
-                if (it != sit && bounding_box.is_inside(&it->bounding_box)) {
+                // Rect<int> bounding_box = sit->bounding_box; // Not needed directly
+                if (it != sit && it->bounding_box.contains(sit->bounding_box)) { // Corrected call
                     TexturePatch::Faces & faces = it->texture_patch->get_faces();
                     TexturePatch::Faces & ofaces = sit->texture_patch->get_faces();
                     faces.insert(faces.end(), ofaces.begin(), ofaces.end());

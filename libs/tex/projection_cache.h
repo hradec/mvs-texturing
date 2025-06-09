@@ -16,6 +16,12 @@ namespace tex { // Or appropriate namespace
 
         T width() const { return max_x - min_x + 1; }
         T height() const { return max_y - min_y + 1; }
+
+        // Checks if 'other_rect' is completely inside this rect.
+        bool contains(Rect<T> const& other_rect) const {
+            return other_rect.min_x >= min_x && other_rect.max_x <= max_x &&
+                   other_rect.min_y >= min_y && other_rect.max_y <= max_y;
+        }
     };
 
     struct CachedFaceTextureInfo {

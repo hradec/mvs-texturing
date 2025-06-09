@@ -11,11 +11,14 @@
 #include <list>
 #include <iostream>
 #include <fstream>
+#include <map> // Added
+#include <algorithm> // For std::find_if
 
 #include <util/timer.h>
 #include <mve/image_tools.h>
 
 #include "defines.h"
+#include "tex/projection_cache.h" // Added
 #include "settings.h"
 #include "histogram.h"
 #include "texture_patch.h"
@@ -175,9 +178,9 @@ generate_texture_atlases(mve::TriangleMesh::ConstPtr mesh, // Added mesh
         for (std::size_t atlas_idx = 0; atlas_idx < texture_atlases->size(); ++atlas_idx) {
             TextureAtlas::ConstPtr atlas = (*texture_atlases)[atlas_idx];
 
-            mve::TriangleMesh::FaceList const& atlas_mesh_face_ids = atlas->get_faces();
-            tex::TextureAtlas::TexcoordList const& atlas_uvs = atlas->get_texcoords();
-            tex::TextureAtlas::TexcoordIdList const& atlas_vertex_ids_for_uvs = atlas->get_texcoord_ids();
+            std::vector<std::size_t> const& atlas_mesh_face_ids = atlas->get_faces(); // Using std::vector directly for clarity
+            std::vector<math::Vec2f> const& atlas_uvs = atlas->get_texcoords(); // Using std::vector directly for clarity
+            std::vector<std::size_t> const& atlas_vertex_ids_for_uvs = atlas->get_texcoord_ids(); // Using std::vector directly for clarity
 
             std::map<std::size_t, math::Vec2f> vertex_to_uv_map;
             for(size_t i=0; i < atlas_vertex_ids_for_uvs.size(); ++i) {
@@ -188,7 +191,7 @@ generate_texture_atlases(mve::TriangleMesh::ConstPtr mesh, // Added mesh
                 std::size_t current_mesh_face_id = atlas_mesh_face_ids[i];
 
                 auto info_iter = std::find_if(io_projection_cache->begin(), io_projection_cache->end(),
-                                                 [current_mesh_face_id](CachedFaceTextureInfo const& cfti){ return cfti.face_id == current_mesh_face_id; });
+                    [current_mesh_face_id](tex::CachedFaceTextureInfo const& cfti){ return cfti.face_id == current_mesh_face_id; });
 
                 if (info_iter != io_projection_cache->end()) {
                     info_iter->target_atlas_idx = atlas_idx;
