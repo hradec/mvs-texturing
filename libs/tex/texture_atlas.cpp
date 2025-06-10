@@ -16,6 +16,8 @@
 
 #include "texture_atlas.h"
 
+TEX_NAMESPACE_BEGIN
+
 TextureAtlas::TextureAtlas(unsigned int size) :
     size(size), padding(size >> 7), finalized(false) {
 
@@ -320,3 +322,5 @@ TextureAtlas::pre_populate_layout(Faces const& new_faces, TexcoordIds const& new
     // `finalize()` will then call `merge_texcoords()` which will populate `texcoord_ids`
     // and deduplicate `texcoords`. This seems like the correct flow.
 }
+
+TEX_NAMESPACE_END
