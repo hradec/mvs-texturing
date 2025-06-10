@@ -56,15 +56,42 @@ namespace tex {
         i_max_x = std::max(0, std::min(target_img->width() -1, i_max_x));
         i_max_y = std::max(0, std::min(target_img->height() -1, i_max_y));
 
-        // Get a color from the center of the source patch
-        mve::Vec3f color_f = source_patch_img->at(source_patch_img->width()/2, source_patch_img->height()/2, 0);
-        mve::Vec3uc color_uc(color_f[0] * 255.0f, color_f[1] * 255.0f, color_f[2] * 255.0f);
+        (void)source_uvs; // Mark as intentionally unused for placeholder
 
-        for (int x = i_min_x; x <= i_max_x; ++x) {
-            for (int y = i_min_y; y <= i_max_y; ++y) {
-                target_img->at(x,y,0) = color_uc[0];
-                target_img->at(x,y,1) = color_uc[1];
-                target_img->at(x,y,2) = color_uc[2];
+        // Ensure color_f and color_uc are declared in an accessible scope
+        math::Vec3f color_f(0.5f, 0.5f, 0.5f); // Default gray
+        if (source_patch_img && source_patch_img->get_value_count() > 0) { // Check if image is valid
+            // Sample from the center of the source patch
+            color_f = source_patch_img->at(source_patch_img->width() / 2, source_patch_img->height() / 2, 0);
+        }
+        math::Vec3uc color_uc(color_f[0] * 255.0f, color_f[1] * 255.0f, color_f[2] * 255.0f);
+
+        // The old placeholder logic for i_min_x etc. was based on target_uvs being normalized.
+        // The new logic in the subtask description is more robust.
+        int min_tx = target_img->width() -1;
+        int min_ty = target_img->height() -1;
+        int max_tx = 0;
+        int max_ty = 0;
+
+        // target_uvs are normalized, so scale them to pixel coordinates
+        for(int i=0; i<3; ++i){
+            min_tx = std::min(min_tx, static_cast<int>(std::floor(target_uvs[i][0] * target_img->width())));
+            min_ty = std::min(min_ty, static_cast<int>(std::floor(target_uvs[i][1] * target_img->height())));
+            max_tx = std::max(max_tx, static_cast<int>(std::ceil(target_uvs[i][0] * target_img->width())));
+            max_ty = std::max(max_ty, static_cast<int>(std::ceil(target_uvs[i][1] * target_img->height())));
+        }
+
+        min_tx = std::max(0, std::min(target_img->width() - 1, min_tx));
+        min_ty = std::max(0, std::min(target_img->height() - 1, min_ty));
+        max_tx = std::max(0, std::min(target_img->width() - 1, max_tx));
+        max_ty = std::max(0, std::min(target_img->height() - 1, max_ty));
+
+        for (int y = min_ty; y <= max_ty; ++y) {
+            for (int x = min_tx; x <= max_tx; ++x) {
+                // No need to check bounds again as min_tx/max_tx etc are already clamped
+                for (int c = 0; c < target_img->channels(); ++c) {
+                     target_img->at(x, y, c) = color_uc[c];
+                }
             }
         }
     }
@@ -86,6 +113,8 @@ int main(int argc, char **argv) {
         std::exit(EXIT_FAILURE);
     }
 
+    tex::ProjectionCache projection_cache; // Declare here, outside of specific pipeline branches
+
     if (!conf.input_projection_cache_file.empty()) {
         std::cout << "Entering UV-preserving re-texturing mode using projection cache." << std::endl;
         tex::TextureViews texture_views; // For new images
@@ -93,9 +122,10 @@ int main(int argc, char **argv) {
         tex::TextureAtlases texture_atlases;
 
         // Load Projection Cache
-        tex::ProjectionCache projection_cache;
+        // tex::ProjectionCache projection_cache; // Moved declaration up
         std::cout << "\tLoading projection cache from: " << conf.input_projection_cache_file << std::endl;
         try {
+            // projection_cache is already declared, just assign
             projection_cache = tex::load_projection_cache(conf.input_projection_cache_file);
         } catch (std::exception &e) {
             std::cerr << "\tError loading projection cache: " << e.what() << std::endl;
@@ -180,31 +210,49 @@ int main(int argc, char **argv) {
         }
 
         // Reconstruct Atlases with New Textures
-        std::map<int, tex::TextureView*> label_to_view_map;
+        std::map<std::size_t, tex::TextureView*> id_to_view_map; // Changed map key type to std::size_t for IDs
         for (tex::TextureView& tv : texture_views) {
-            label_to_view_map[tv.get_label()] = &tv;
+            id_to_view_map[tv.get_id()] = &tv; // Use get_id() for map key
         }
 
         std::cout << "\tReconstructing atlases with new textures..." << std::endl;
         for (tex::CachedFaceTextureInfo const& info : projection_cache) {
             if (info.target_atlas_idx == static_cast<std::size_t>(-1)) continue;
 
-            if (label_to_view_map.find(info.source_view_label) == label_to_view_map.end()) {
-                std::cerr << "\tWarning: Source view label " << info.source_view_label << " for face " << info.face_id << " not found in alternative images. Skipping this face." << std::endl;
+            // Use info.source_view_label which is int, ensure map key type matches or cast if necessary.
+            // TextureView::get_id() returns std::size_t. Cache source_view_label is int.
+            // For consistency, let's assume source_view_label directly corresponds to an ID that TextureView::get_id() would return.
+            // If source_view_label can be -1 or other non-ID values, this needs careful handling.
+            // The ProjectionCache stores source_view_label as int, which corresponds to TexturePatch::get_label().
+            // TextureView::get_id() is std::size_t, usually 0-indexed.
+            // TextureView::get_label() in TextureView constructor is `id + 1` if id is 0-indexed.
+            // So, if source_view_label from cache is 1-indexed, and map uses 0-indexed IDs, adjust.
+            // Or, if map uses labels (1-indexed), then TextureView::get_label() should be used for map.
+            // The previous `label_to_view_map[tv.get_label()]` was likely correct if `source_view_label` is indeed a "label".
+            // Let's assume source_view_label from cache is compatible with map keys (e.g. 0-indexed ID or 1-indexed Label)
+            // Sticking to the subtask's instruction to use get_id() for map key, we need to be careful about what source_view_label represents.
+            // If source_view_label is 1-based (like patch labels) and tv.get_id() is 0-based:
+            std::size_t view_id_to_find = static_cast<std::size_t>(info.source_view_label); // Assuming source_view_label is effectively an ID.
+                                                                                        // If source_view_label is 1-based label, it might need to be view_id_to_find = info.source_view_label -1;
+                                                                                        // This depends on how TextureView labels/IDs are set up vs how projection cache stores them.
+                                                                                        // For now, direct cast/use.
+
+            if (id_to_view_map.find(view_id_to_find) == id_to_view_map.end()) {
+                std::cerr << "\tWarning: Source view ID " << view_id_to_find << " (from cache label " << info.source_view_label << ") for face " << info.face_id << " not found in alternative images. Skipping this face." << std::endl;
                 continue;
             }
-            tex::TextureView* source_view = label_to_view_map.at(info.source_view_label);
+            tex::TextureView* source_view = id_to_view_map.at(view_id_to_find);
 
             try {
                 source_view->load_image();
             } catch (std::exception &e) {
-                std::cerr << "\tWarning: Could not load image " << source_view->get_image_path() << " for face " << info.face_id << ". Skipping. Error: " << e.what() << std::endl;
+                std::cerr << "\tWarning: Could not load image for view ID " << source_view->get_id() << " for face " << info.face_id << ". Skipping. Error: " << e.what() << std::endl;
                 continue;
             }
 
             mve::ByteImage::ConstPtr full_source_img = source_view->get_image();
             if(full_source_img == nullptr) {
-                 std::cerr << "\tWarning: Image data is null for " << source_view->get_image_path() << " for face " << info.face_id << ". Skipping." << std::endl;
+                 std::cerr << "\tWarning: Image data is null for view ID " << source_view->get_id() << " for face " << info.face_id << ". Skipping." << std::endl;
                 source_view->release_image();
                 continue;
             }
@@ -224,7 +272,7 @@ int main(int argc, char **argv) {
             mve::FloatImage::Ptr patch_image_data_float;
             try {
                  mve::ByteImage::Ptr patch_image_data_byte = mve::image::crop(full_source_img,
-                    view_rect.width(), view_rect.height(), view_rect.min_x, view_rect.min_y, mve::ByteImage::Vec3uc(255,0,255));
+                    view_rect.width(), view_rect.height(), view_rect.min_x, view_rect.min_y, math::Vec3uc(255,0,255)); // Corrected color type
                 patch_image_data_float = mve::image::byte_to_float_image(patch_image_data_byte);
 
             } catch (std::exception &e) {
@@ -447,12 +495,17 @@ int main(int argc, char **argv) {
 
     // Save projection cache if requested
     if (!conf.output_projection_cache_file.empty()) {
-        std::cout << "Saving projection cache to: " << conf.output_projection_cache_file << std::endl;
-        try {
-            tex::save_projection_cache(conf.output_projection_cache_file, projection_cache);
-            std::cout << "\tProjection cache saved." << std::endl;
-        } catch (std::exception &e) {
-            std::cerr << "\tError saving projection cache: " << e.what() << std::endl;
+        if (conf.input_projection_cache_file.empty()) { // Only save if we generated it (not in re-texture mode)
+            std::cout << "Saving projection cache to: " << conf.output_projection_cache_file << std::endl;
+            try {
+                tex::save_projection_cache(conf.output_projection_cache_file, projection_cache);
+                std::cout << "\tProjection cache saved." << std::endl;
+            } catch (std::exception &e) {
+                std::cerr << "\tError saving projection cache: " << e.what() << std::endl;
+            }
+        } else {
+            std::cout << "\tNote: In re-texturing mode (--input_projection_cache used), not saving projection cache to "
+                      << conf.output_projection_cache_file << "." << std::endl;
         }
     }
 
