@@ -60,9 +60,17 @@ namespace tex {
 
         // Ensure color_f and color_uc are declared in an accessible scope
         math::Vec3f color_f(0.5f, 0.5f, 0.5f); // Default gray
-        if (source_patch_img && source_patch_img->get_value_count() > 0) { // Check if image is valid
+        if (source_patch_img && source_patch_img->get_value_amount() > 0) { // Check if image is valid
             // Sample from the center of the source patch
-            color_f = source_patch_img->at(source_patch_img->width() / 2, source_patch_img->height() / 2, 0);
+            if (source_patch_img->channels() >= 3) {
+                color_f[0] = source_patch_img->at(source_patch_img->width() / 2, source_patch_img->height() / 2, 0); // R
+                color_f[1] = source_patch_img->at(source_patch_img->width() / 2, source_patch_img->height() / 2, 1); // G
+                color_f[2] = source_patch_img->at(source_patch_img->width() / 2, source_patch_img->height() / 2, 2); // B
+            } else if (source_patch_img->channels() == 1) {
+                float gray_val = source_patch_img->at(source_patch_img->width() / 2, source_patch_img->height() / 2, 0);
+                color_f[0] = gray_val; color_f[1] = gray_val; color_f[2] = gray_val;
+            }
+            // If other channel counts, color_f remains default gray, which is handled.
         }
         math::Vec3uc color_uc(color_f[0] * 255.0f, color_f[1] * 255.0f, color_f[2] * 255.0f);
 
@@ -271,8 +279,10 @@ int main(int argc, char **argv) {
 
             mve::FloatImage::Ptr patch_image_data_float;
             try {
-                 mve::ByteImage::Ptr patch_image_data_byte = mve::image::crop(full_source_img,
-                    view_rect.width(), view_rect.height(), view_rect.min_x, view_rect.min_y, math::Vec3uc(255,0,255)); // Corrected color type
+                // Define the magenta fill color for byte images
+                static unsigned char magenta_fill_byte[] = {255, 0, 255};
+                mve::ByteImage::Ptr patch_image_data_byte = mve::image::crop(full_source_img,
+                    view_rect.width(), view_rect.height(), view_rect.min_x, view_rect.min_y, magenta_fill_byte);
                 patch_image_data_float = mve::image::byte_to_float_image(patch_image_data_byte);
 
             } catch (std::exception &e) {
