@@ -10,6 +10,7 @@
 #ifndef TEX_TEXTUREATLAS_HEADER
 #define TEX_TEXTUREATLAS_HEADER
 
+#include "tex/defines.h" // For TEX_NAMESPACE_BEGIN and TEX_NAMESPACE_END
 
 #include <vector>
 
